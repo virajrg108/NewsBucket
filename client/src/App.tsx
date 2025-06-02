@@ -1,4 +1,5 @@
 import { Newspaper, Wifi } from "lucide-react";
+import NewsList from "./components/NewsList/NewsList.tsx";
 
 function App() {
   return (
@@ -19,6 +20,7 @@ function App() {
           </div>
         </div>
       </header>
+      <NewsList />
     </div>
   )
 }
