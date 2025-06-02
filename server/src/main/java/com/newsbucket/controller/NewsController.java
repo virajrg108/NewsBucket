@@ -1,6 +1,7 @@
 package com.newsbucket.controller;
 
-import com.newsbucket.model.News;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.newsbucket.model.Article;
 import com.newsbucket.service.NewsService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -11,21 +12,21 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
+@RequestMapping("api")
 public class NewsController {
 
-//    @Autowired
-//    NewsService newsService;
+    @Autowired
+    NewsService newsService;
 
-    @GetMapping("")
-    public String getNews() {
-        return "Hello World!!";
-    }
 
-//    public String getNews(
-//            @RequestParam(name="q", required = false) String keyword
-//    ) {
-//        String output = newsService.fetchNews(keyword);
-//        return output;
+//    public String getNews() {
+//        return "Hello World!!";
 //    }
+    @GetMapping("/news")
+    public List<Article> getNews(
+            @RequestParam(name="q", required = false) String keyword
+    ) throws JsonProcessingException {
+        return newsService.fetchNews(keyword);
+    }
 
 }
