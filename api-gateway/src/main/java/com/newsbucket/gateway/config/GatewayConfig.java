@@ -26,11 +26,7 @@ public class GatewayConfig {
                                         .setFallbackUri("forward:/fallback/news"))
                                 .rewritePath("/api/(?<segment>.*)", "/api/${segment}")
                                 .requestRateLimiter(c -> c
-                                        .setRateLimiter(RedisRateLimiter.builder()
-                                                .replenishRate(10)
-                                                .burstCapacity(20)
-                                                .requestedTokens(1)
-                                                .build())
+                                        .setRateLimiter(new RedisRateLimiter(10, 20, 1))
                                         .setKeyResolver(this.ipKeyResolver())
                                         .setStatusCode(HttpStatus.TOO_MANY_REQUESTS))
                                 .retry(retryConfig -> retryConfig

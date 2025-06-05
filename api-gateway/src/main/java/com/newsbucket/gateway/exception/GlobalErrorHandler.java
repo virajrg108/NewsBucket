@@ -34,7 +34,7 @@ public class GlobalErrorHandler implements ErrorWebExceptionHandler {
             status = HttpStatus.NOT_FOUND;
             message = "Service not found";
         } else if (ex instanceof ResponseStatusException) {
-            status = ((ResponseStatusException) ex).getStatusCode();
+            status = HttpStatus.valueOf(((ResponseStatusException) ex).getStatusCode().value());
             message = ex.getMessage();
         } else {
             status = HttpStatus.INTERNAL_SERVER_ERROR;

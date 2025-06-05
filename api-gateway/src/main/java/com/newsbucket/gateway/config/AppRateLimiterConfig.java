@@ -8,7 +8,7 @@ import org.springframework.context.annotation.Configuration;
 import java.time.Duration;
 
 @Configuration
-public class RateLimiterConfig {
+public class AppRateLimiterConfig {
 
     @Bean
     public RateLimiterRegistry rateLimiterRegistry() {
