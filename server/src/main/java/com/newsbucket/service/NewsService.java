@@ -4,6 +4,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.newsbucket.model.Article;
+
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -18,15 +20,19 @@ import java.util.Map;
 @Service
 public class NewsService {
 
-    static String url = "https://newsapi.org/v2/everything?q=apple&apiKey=ccaf5d41cc5140c984818c344edcc14d";
+    static String url = "https://newsapi.org/v2/everything";
     RestTemplate restTemplate = new RestTemplate();
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+     @Value("${newsapi.key}")
+     private String newsApiKey;
+
     public List<Article> fetchNews(String keyword) throws JsonProcessingException {
+         System.out.println("newsAPiKey: " + newsApiKey);
         HttpHeaders headers = new HttpHeaders();
         headers.set(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE);
         HttpEntity<?> entity = new HttpEntity<>(headers);
-        String urlTemplate = UriComponentsBuilder.fromHttpUrl(url)
+        String urlTemplate = UriComponentsBuilder.fromUriString(url)
                 .queryParam("q", "{q}")
                 .queryParam("apiKey", "{apiKey}")
                 .encode()
@@ -34,7 +40,7 @@ public class NewsService {
 
         Map<String, String> params = new HashMap<>();
         params.put("q", keyword);
-        params.put("apiKey", "ccaf5d41cc5140c984818c344edcc14d");
+        params.put("apiKey", newsApiKey);
 
         HttpEntity<String> response = restTemplate.exchange(
                 urlTemplate,
