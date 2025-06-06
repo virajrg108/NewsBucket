@@ -17,7 +17,7 @@ const NewsList = () => {
 
   useEffect(() => {
     axios
-      .get("/api/news?keyword=apple")
+      .get("/api/news?q=apple")
       .then((response) => {
         console.log(response.data);
         setArticles(response.data);
