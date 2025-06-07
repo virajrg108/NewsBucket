@@ -41,4 +41,8 @@ public class Article {
                 ", content='" + content + '\'' +
                 '}';
     }
+
+    public String getPublishedAt() {
+        return publishedAt;
+    }
 }
