@@ -2,6 +2,7 @@ package com.newsbucket.controller;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.newsbucket.model.Article;
+import com.newsbucket.model.ArticleGroup;
 import com.newsbucket.service.NewsService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -22,11 +23,11 @@ public class NewsController {
     // return "Hello World!!";
     // }
     @GetMapping("/news")
-    public ResponseEntity<Map<String, List<Article>>> getNews(
+    public ResponseEntity<List<ArticleGroup>> getNews(
             @RequestParam String keyword,
             @RequestParam(defaultValue = "hours") String intervalType,
             @RequestParam(defaultValue = "12") int number) throws JsonProcessingException {
-        Map<String, List<Article>> groupedArticles = newsService.fetchAndGroupArticles(keyword, intervalType, number);
+        List<ArticleGroup> groupedArticles = newsService.fetchAndGroupArticles(keyword, intervalType, number);
         return ResponseEntity.ok(groupedArticles);
     }
 

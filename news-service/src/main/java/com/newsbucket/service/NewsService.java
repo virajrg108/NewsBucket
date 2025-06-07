@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.newsbucket.model.Article;
 
+import com.newsbucket.model.ArticleGroup;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
@@ -13,6 +14,8 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
@@ -28,7 +31,7 @@ public class NewsService {
     @Value("${newsapi.key}")
     private String newsApiKey;
 
-    public Map<String, List<Article>> fetchAndGroupArticles(String keyword, String intervalType, int number) throws JsonProcessingException {
+    public List<ArticleGroup> fetchAndGroupArticles(String keyword, String intervalType, int number) throws JsonProcessingException {
         List<Article> articles = fetchArticlesFromNewsApi(keyword);
         return groupArticlesByInterval(articles, intervalType, number);
     }
@@ -45,9 +48,11 @@ public class NewsService {
         };
     }
 
-    private Map<String, List<Article>> groupArticlesByInterval(List<Article> articles, String intervalType, int number) {
+    private List<ArticleGroup> groupArticlesByInterval(List<Article> articles, String intervalType, int number) {
+
         ChronoUnit unit = toChronoUnit(intervalType);
-        Instant now = Instant.now();
+        Instant nowInstant = Instant.now();
+        ZonedDateTime now = nowInstant.atZone(ZoneId.systemDefault());
         Map<String, List<Article>> grouped = new HashMap<>();
 
         for (Article article : articles) {
@@ -60,7 +65,7 @@ public class NewsService {
             grouped.computeIfAbsent(bucketLabel, k -> new ArrayList<>()).add(article);
         }
 
-        return grouped.entrySet().stream()
+        grouped.entrySet().stream()
                 .sorted(Comparator.comparingInt(e -> Integer.parseInt(e.getKey())))
                 .collect(Collectors.toMap(
                         Map.Entry::getKey,
@@ -68,6 +73,19 @@ public class NewsService {
                         (e1, e2) -> e1,
                         LinkedHashMap::new
                 ));
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MMM d, yyyy, h:mm a").withZone(ZoneId.of("UTC"));
+        List<ArticleGroup> groupedArticles = new ArrayList<>();
+        for (Map.Entry<String, List<Article>> entry : grouped.entrySet()) {
+            int bucket = Integer.parseInt(entry.getKey());
+            ZonedDateTime endTime = now.minus(unit.getDuration().multipliedBy(bucket));
+            ZonedDateTime startTime = now.minus(unit.getDuration().multipliedBy(bucket + 1));
+
+            String display = formatter.format(startTime) + " - " + formatter.format(endTime);
+
+            ArticleGroup group = new ArticleGroup(entry.getKey(), display, entry.getValue());
+            groupedArticles.add(group);
+        }
+        return groupedArticles;
     }
 
     public List<Article> fetchArticlesFromNewsApi(String keyword) throws JsonProcessingException {
