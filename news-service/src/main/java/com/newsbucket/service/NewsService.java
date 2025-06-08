@@ -89,7 +89,6 @@ public class NewsService {
     }
 
     public List<Article> fetchArticlesFromNewsApi(String keyword) throws JsonProcessingException {
-        System.out.println("newsAPiKey: " + newsApiKey);
         HttpHeaders headers = new HttpHeaders();
         headers.set(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE);
         HttpEntity<?> entity = new HttpEntity<>(headers);
@@ -111,8 +110,6 @@ public class NewsService {
                 params);
         String rawJson = response.getBody();
         JsonNode jsonObj = objectMapper.readTree(rawJson);
-        System.out.println(jsonObj.get("status"));
-        System.out.println(jsonObj.get("totalResults"));
         if (!jsonObj.get("status").textValue().replace("\"", "").equalsIgnoreCase("ok")) {
             // TODO: error handling
             return null;
@@ -120,7 +117,6 @@ public class NewsService {
             JsonNode articlesNode = jsonObj.get("articles");
             String articlesJson = articlesNode.toString();
             List<Article> articles = Arrays.asList(objectMapper.readValue(articlesJson, Article[].class));
-            System.out.println(articles.get(0).toString());
             return articles;
         }
     }
