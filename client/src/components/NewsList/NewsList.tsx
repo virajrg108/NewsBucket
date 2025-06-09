@@ -1,9 +1,8 @@
 import axios from 'axios';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
-import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { ChevronDown, ChevronRight, Clock, MoreHorizontal } from "lucide-react";
+import { Card, CardContent, CardDescription, CardTitle } from "@/components/ui/card";
+import { Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export interface Article {
@@ -22,52 +21,72 @@ interface ArticleGroup {
   articles: Article[];
 }
 
-type Bucket = {
-  [bucketLabel: string]: Article[];
-};
-
 const NewsList = () => {
-  const [buckets, setBuckets] = useState<any[]>([]);
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [bucketMap, setBucketMap] = useState<Record<string, ArticleGroup>>({});
+
+  // Merge a new ArticleGroup into existing bucketMap
+  const mergeGroup = useCallback((newGroup: ArticleGroup) => {
+    setBucketMap(prevMap => {
+      const existingGroup = prevMap[newGroup.bucketLabel];
+      const mergedArticles = existingGroup
+        ? [...existingGroup.articles, ...newGroup.articles]
+        : [...newGroup.articles];
+
+      return {
+        ...prevMap,
+        [newGroup.bucketLabel]: {
+          bucketLabel: newGroup.bucketLabel,
+          timeRangeDisplay: newGroup.timeRangeDisplay,
+          articles: mergedArticles,
+        }
+      };
+    });
+  }, []);
 
   useEffect(() => {
-    console.log("Starting api request");
-    axios
-      .get('http://localhost:8081/api/news?keyword=apple&intervalType=days&number=12')
-      .then((response) => {
-        console.log(response.data);
-        setBuckets(response.data);
-      })
-      .catch((error) => {
-        console.error('Error fetching articles:', error);
-      });
-  }, []);
+    const eventSource = new EventSource('http://localhost:8081/api/news/stream?keyword=apple&intervalType=days&number=2');
+
+    eventSource.onmessage = (event) => {
+      const data: ArticleGroup = JSON.parse(event.data);
+      mergeGroup(data);
+    };
+
+    eventSource.onerror = (err) => {
+      console.error("Streaming error:", err);
+      eventSource.close();
+    };
+
+    return () => eventSource.close();
+  }, [mergeGroup]);
+
+  // Convert map to sorted array (newest first)
+  const sortedBuckets = Object.values(bucketMap).sort(
+    (a, b) => parseInt(b.bucketLabel) - parseInt(a.bucketLabel)
+  );
 
   return (
     <div className="news-list max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="mt-8">
-        <h3 className="text-lg font-semibold mb-4">Search Results for "keyword"</h3>
+        <h3 className="text-lg font-semibold mb-4">Search Results for "apple"</h3>
 
         <Accordion type="single" collapsible className="mb-4 bg-white shadow-sm rounded-lg">
-          {buckets.map((bucket, idx) => (
-
-            <AccordionItem value={`item-${idx}`} key={idx} className='sm:p-2 md:p-4'>
-              <AccordionTrigger>{bucket.timeRangeDisplay} ({bucket.articles?.length} articles)</AccordionTrigger>
+          {sortedBuckets.map((bucket, idx) => (
+            <AccordionItem value={`item-${idx}`} key={bucket.bucketLabel} className="sm:p-2 md:p-4">
+              <AccordionTrigger>
+                {bucket.timeRangeDisplay} ({bucket.articles?.length} articles)
+              </AccordionTrigger>
               <AccordionContent>
-                {bucket.articles.map((article: Article, idx: number) => {
-                  return <Card key={article.url || idx} className="mb-4 hover:shadow-lg transition-all duration-300 bg-gray-50"> {/* Use a more stable key if possible */}
-                    <CardContent> {/* Added pt-6 to mimic CardHeader padding if CardHeader is removed or content moved here */}
+                {bucket.articles.map((article, idx) => (
+                  <Card key={article.url || idx} className="mb-4 hover:shadow-lg transition-all duration-300 bg-gray-50">
+                    <CardContent>
                       <div className="flex justify-between items-start">
-                        <div className="flex-grow mr-4"> {/* Text content on the left */}
+                        <div className="flex-grow mr-4">
                           <CardTitle className="text-lg font-semibold mb-1">{article.title}</CardTitle>
                           <CardDescription className="text-sm text-muted-foreground mb-2 text-ellipsis overflow-hidden line-clamp-2">
                             {article.description}
                           </CardDescription>
                           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                            <span className="text-xs">
-                              By {article.author}
-                            </span>
-
+                            <span className="text-xs">By {article.author}</span>
                             <span className="text-xs pl-1">
                               <Clock size={14} className="inline mr-1" />
                               {new Date(article.publishedAt).toLocaleDateString('en-US', {
@@ -80,35 +99,26 @@ const NewsList = () => {
                                 hour12: true,
                               })}
                             </span>
-
                             <div className="w-full sm:w-auto mt-1 sm:mt-0">
                               <a href={article.url} target="_blank" rel="noopener noreferrer">
                                 <Button variant="link">Read more</Button>
                               </a>
                             </div>
                           </div>
-                          {/* <p className="text-sm text-muted-foreground text-ellipsis overflow-hidden line-clamp-2">{article.content}</p> Added line-clamp for brevity */}
                         </div>
                         {article.urlToImage && (
-                          <img src={article.urlToImage} alt={article.title} className="w-20 h-20 object-cover rounded-md flex-shrink-0" /> /* Image on the right */
+                          <img src={article.urlToImage} alt={article.title} className="w-20 h-20 object-cover rounded-md flex-shrink-0" />
                         )}
                       </div>
                     </CardContent>
                   </Card>
-                })}
+                ))}
               </AccordionContent>
             </AccordionItem>
-
-
-          ))
-
-          }
+          ))}
         </Accordion>
-        {/* {groups.length === 0 && !isLoading && (
-          <p className="text-sm text-muted-foreground">No articles found.</p>
-        )} */}
-      </div >
-    </div >
+      </div>
+    </div>
   );
 };
 

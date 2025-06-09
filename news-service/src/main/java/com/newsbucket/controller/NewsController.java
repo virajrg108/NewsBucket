@@ -5,8 +5,10 @@ import com.newsbucket.model.Article;
 import com.newsbucket.model.ArticleGroup;
 import com.newsbucket.service.NewsService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import reactor.core.publisher.Flux;
 
 import java.util.List;
 import java.util.Map;
@@ -22,13 +24,21 @@ public class NewsController {
     // public String getNews() {
     // return "Hello World!!";
     // }
-    @GetMapping("/news")
-    public ResponseEntity<List<ArticleGroup>> getNews(
+//    @GetMapping("/news")
+//    public ResponseEntity<List<ArticleGroup>> getNews(
+//            @RequestParam String keyword,
+//            @RequestParam(defaultValue = "hours") String intervalType,
+//            @RequestParam(defaultValue = "12") int number) throws JsonProcessingException {
+//        List<ArticleGroup> groupedArticles = newsService.fetchAndGroupArticles(keyword, intervalType, number);
+//        return ResponseEntity.ok(groupedArticles);
+//    }
+
+    @GetMapping(value = "/news/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<ArticleGroup> streamGroupedNews(
             @RequestParam String keyword,
-            @RequestParam(defaultValue = "hours") String intervalType,
-            @RequestParam(defaultValue = "12") int number) throws JsonProcessingException {
-        List<ArticleGroup> groupedArticles = newsService.fetchAndGroupArticles(keyword, intervalType, number);
-        return ResponseEntity.ok(groupedArticles);
+            @RequestParam String intervalType,
+            @RequestParam int number) {
+        return newsService.streamGroupedArticlesByPage(keyword, intervalType, number);
     }
 
 }
