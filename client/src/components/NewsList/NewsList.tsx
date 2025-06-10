@@ -1,9 +1,12 @@
 import axios from 'axios';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, type FormEvent } from 'react';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { Card, CardContent, CardDescription, CardTitle } from "@/components/ui/card";
-import { Clock } from "lucide-react";
+import { Clock, Loader } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export interface Article {
   author: string | null;
@@ -23,6 +26,11 @@ interface ArticleGroup {
 
 const NewsList = () => {
   const [bucketMap, setBucketMap] = useState<Record<string, ArticleGroup>>({});
+  const [keyword, setKeyword] = useState<string>("tech");
+  const [intervalType, setIntervalType] = useState<string>("hours");
+  const [number, setNumber] = useState<string>("12");
+  const [eventSource, setEventSource] = useState<EventSource | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   // Merge a new ArticleGroup into existing bucketMap
   const mergeGroup = useCallback((newGroup: ArticleGroup) => {
@@ -43,20 +51,65 @@ const NewsList = () => {
     });
   }, []);
 
-  useEffect(() => {
-    const eventSource = new EventSource('http://localhost:8081/api/news/stream?keyword=apple&intervalType=days&number=2');
-
-    eventSource.onmessage = (event) => {
+  const handleSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    
+    // Close existing event source if any
+    if (eventSource) {
+      eventSource.close();
+      setIsLoading(false);
+    }
+    
+    // Clear existing data and set loading state
+    setBucketMap({});
+    setIsLoading(true);
+    
+    // Create new event source with the form parameters
+    const newEventSource = new EventSource(
+      `http://localhost:8081/api/news/stream?keyword=${encodeURIComponent(keyword)}&intervalType=${intervalType}&number=${number}`
+    );
+    
+    newEventSource.onmessage = (event) => {
       const data: ArticleGroup = JSON.parse(event.data);
       mergeGroup(data);
+      // setIsLoading(false); // Set loading to false when we receive data
     };
-
-    eventSource.onerror = (err) => {
+    
+    newEventSource.onerror = (err) => {
       console.error("Streaming error:", err);
-      eventSource.close();
+      newEventSource.close();
+      setIsLoading(false); // Set loading to false on error
+    };
+    
+    setEventSource(newEventSource);
+  };
+
+  useEffect(() => {
+    // Initial event source setup
+    const initialEventSource = new EventSource(
+      `http://localhost:8081/api/news/stream?keyword=${encodeURIComponent(keyword)}&intervalType=${intervalType}&number=${number}`
+    );
+
+    initialEventSource.onmessage = (event) => {
+      const data: ArticleGroup = JSON.parse(event.data);
+      mergeGroup(data);
+      setIsLoading(false); // Set loading to false when we receive data
     };
 
-    return () => eventSource.close();
+    initialEventSource.onerror = (err) => {
+      console.error("Streaming error:", err);
+      initialEventSource.close();
+      setIsLoading(false); // Set loading to false on error
+    };
+
+    setEventSource(initialEventSource);
+
+    return () => {
+      if (initialEventSource) {
+        initialEventSource.close();
+        setIsLoading(false);
+      }
+    };
   }, [mergeGroup]);
 
   // Convert map to sorted array (newest first)
@@ -67,7 +120,58 @@ const NewsList = () => {
   return (
     <div className="news-list max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="mt-8">
-        <h3 className="text-lg font-semibold mb-4">Search Results for "apple"</h3>
+        <form onSubmit={handleSubmit} className="mb-6 p-4 bg-white shadow-sm rounded-lg">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="flex flex-col space-y-1.5">
+              <Label htmlFor="keyword">Keyword</Label>
+              <Input 
+                id="keyword" 
+                value={keyword} 
+                onChange={(e) => setKeyword(e.target.value)} 
+                placeholder="Enter search term" 
+              />
+            </div>
+            <div className="flex flex-col space-y-1.5">
+              <Label htmlFor="intervalType">Interval Type</Label>
+              <Select value={intervalType} onValueChange={setIntervalType}>
+                <SelectTrigger id="intervalType">
+                  <SelectValue placeholder="Select interval" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="hours">Hours</SelectItem>
+                  <SelectItem value="days">Days</SelectItem>
+                  <SelectItem value="weeks">Weeks</SelectItem>
+                  <SelectItem value="months">Months</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col space-y-1.5">
+              <Label htmlFor="number">Number</Label>
+              <Input 
+                id="number" 
+                type="number" 
+                value={number} 
+                onChange={(e) => setNumber(e.target.value)} 
+                placeholder="Enter number" 
+                min="1"
+              />
+            </div>
+            <div className="flex flex-col space-y-1.5">
+              <Label htmlFor="number">&nbsp;</Label>
+              <Button type="submit" className="w-full">Search</Button>
+            </div>
+          </div>
+        </form>
+
+        <div className="flex items-center gap-2 mb-4">
+          <h3 className="text-lg font-semibold">Search Results for "{keyword}"</h3>
+          {isLoading && (
+            <div className="flex items-center text-sm text-gray-500">
+              <Loader className="animate-spin h-4 w-4 mr-1" />
+              <span>loading</span>
+            </div>
+          )}
+        </div>
 
         <Accordion type="single" collapsible className="mb-4 bg-white shadow-sm rounded-lg">
           {sortedBuckets.map((bucket, idx) => (
