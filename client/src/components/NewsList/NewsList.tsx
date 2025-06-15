@@ -1,4 +1,3 @@
-import axios from 'axios';
 import { useEffect, useState, useCallback, type FormEvent } from 'react';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { Card, CardContent, CardDescription, CardTitle } from "@/components/ui/card";
@@ -27,8 +26,8 @@ interface ArticleGroup {
 const NewsList = () => {
   const [bucketMap, setBucketMap] = useState<Record<string, ArticleGroup>>({});
   const [keyword, setKeyword] = useState<string>("tech");
-  const [intervalType, setIntervalType] = useState<string>("hours");
-  const [number, setNumber] = useState<string>("12");
+  const [intervalType, setIntervalType] = useState<string>("days");
+  const [number, setNumber] = useState<string>("1");
   const [eventSource, setEventSource] = useState<EventSource | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
@@ -64,9 +63,10 @@ const NewsList = () => {
     setBucketMap({});
     setIsLoading(true);
     
+    console.log("calling backend", window.location.origin.replace(":3000", ":8081"));
     // Create new event source with the form parameters
     const newEventSource = new EventSource(
-      `http://localhost:8081/api/news/stream?keyword=${encodeURIComponent(keyword)}&intervalType=${intervalType}&number=${number}`
+      `${window.location.href.replace(":3000",':8081')}api/news/stream?keyword=${encodeURIComponent(keyword)}&intervalType=${intervalType}&number=${number}`
     );
     
     newEventSource.onmessage = (event) => {
@@ -85,21 +85,23 @@ const NewsList = () => {
   };
 
   useEffect(() => {
-    // Initial event source setup
+
+    // const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:8081";
+    console.log("calling backend", window.location.href.replace(":3000",':8081'));
     const initialEventSource = new EventSource(
-      `http://localhost:8081/api/news/stream?keyword=${encodeURIComponent(keyword)}&intervalType=${intervalType}&number=${number}`
+      `${window.location.href.replace(":3000",':8081')}api/news/stream?keyword=${encodeURIComponent(keyword)}&intervalType=${intervalType}&number=${number}`
     );
 
     initialEventSource.onmessage = (event) => {
       const data: ArticleGroup = JSON.parse(event.data);
       mergeGroup(data);
-      setIsLoading(false); // Set loading to false when we receive data
+      setIsLoading(false);
     };
 
     initialEventSource.onerror = (err) => {
       console.error("Streaming error:", err);
       initialEventSource.close();
-      setIsLoading(false); // Set loading to false on error
+      setIsLoading(false);
     };
 
     setEventSource(initialEventSource);
@@ -112,7 +114,6 @@ const NewsList = () => {
     };
   }, [mergeGroup]);
 
-  // Convert map to sorted array (newest first)
   const sortedBuckets = Object.values(bucketMap).sort(
     (a, b) => parseInt(b.bucketLabel) - parseInt(a.bucketLabel)
   );

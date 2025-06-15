@@ -31,10 +31,10 @@ public class NewsService {
     }
 
     public Flux<ArticleGroup> streamGroupedArticlesByPage(String keyword, String intervalType, int number) {
+        System.out.println("new api key: " + newsApiKey);
         ChronoUnit unit = toChronoUnit(intervalType);
-        Instant nowInstant = Instant.now();
-        ZonedDateTime now = nowInstant.atZone(ZoneId.systemDefault());
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MMM d, yyyy, h:mm a").withZone(ZoneId.systemDefault());
+        ZonedDateTime now = ZonedDateTime.now();
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MMM d, yyyy, h:mm a");
 
         return Flux.create(sink -> {
             fetchPage(1, keyword, intervalType, number, sink, unit, now, formatter);
@@ -65,26 +65,48 @@ public class NewsService {
                         }
 
                         JsonNode articlesNode = root.get("articles");
+                        if (articlesNode == null || !articlesNode.isArray() || articlesNode.size() == 0) {
+                            sink.complete();
+                            return Collections.<ArticleGroup>emptyList();
+                        }
+
                         List<Article> articles = objectMapper.readerForListOf(Article.class).readValue(articlesNode);
 
-                        // Grouping
+                        // Grouping with corrected logic
                         Map<String, List<Article>> grouped = new HashMap<>();
                         for (Article article : articles) {
-                            Instant publishedAt = Instant.parse(article.getPublishedAt());
-                            long age = unit.between(publishedAt, now);
-                            int bucket = (int) (age / number);
-                            String bucketLabel = String.valueOf(bucket);
-                            grouped.computeIfAbsent(bucketLabel, k -> new ArrayList<>()).add(article);
+                            if (article.getPublishedAt() == null) continue;
+
+                            try {
+                                Instant publishedAt = Instant.parse(article.getPublishedAt());
+                                ZonedDateTime publishedTime = publishedAt.atZone(now.getZone());
+
+                                // Calculate which interval bucket this article belongs to
+                                long totalUnits = unit.between(publishedTime, now);
+                                int bucketIndex = (int) (totalUnits / number);
+
+                                String bucketKey = String.valueOf(bucketIndex);
+                                grouped.computeIfAbsent(bucketKey, k -> new ArrayList<>()).add(article);
+                            } catch (Exception e) {
+                                // Skip articles with invalid dates
+                                System.err.println("Skipping article with invalid date: " + article.getPublishedAt());
+                            }
                         }
 
                         return grouped.entrySet().stream()
                                 .map(entry -> {
-                                    int bucket = Integer.parseInt(entry.getKey());
-                                    ZonedDateTime endTime = now.minus(unit.getDuration().multipliedBy(bucket));
-                                    ZonedDateTime startTime = now.minus(unit.getDuration().multipliedBy(bucket + 1));
-                                    String label = formatter.format(startTime) + " - " + formatter.format(endTime);
-                                    return new ArticleGroup(entry.getKey(), label, entry.getValue());
+                                    int bucketIndex = Integer.parseInt(entry.getKey());
+
+                                    // Calculate interval boundaries
+                                    // For bucket 0: most recent interval (now - number*unit to now)
+                                    // For bucket 1: next interval (now - 2*number*unit to now - number*unit)
+                                    ZonedDateTime intervalEnd = subtractUnits(now, bucketIndex * number, unit);
+                                    ZonedDateTime intervalStart = subtractUnits(now, (bucketIndex + 1) * number, unit);
+
+                                    String timeRangeDisplay = formatter.format(intervalStart) + " - " + formatter.format(intervalEnd);
+                                    return new ArticleGroup(entry.getKey(), timeRangeDisplay, entry.getValue());
                                 })
+                                .sorted(Comparator.comparing((ArticleGroup ag) -> Integer.parseInt(ag.getBucketLabel())).reversed()) // Sort by bucket index (0=most recent, 1=older, etc.)
                                 .collect(Collectors.toList());
 
                     } catch (Exception e) {
@@ -98,18 +120,36 @@ public class NewsService {
                             sink.next(group);
                         }
                         fetchPage(page + 1, keyword, intervalType, number, sink, unit, now, formatter);
+                    } else {
+                        // No more articles, complete the stream
+                        sink.complete();
                     }
                 }, sink::error);
     }
 
+    /**
+     * Properly subtract units from a ZonedDateTime based on the ChronoUnit type
+     */
+    private ZonedDateTime subtractUnits(ZonedDateTime dateTime, long amount, ChronoUnit unit) {
+        return switch (unit) {
+            case MINUTES -> dateTime.minusMinutes(amount);
+            case HOURS -> dateTime.minusHours(amount);
+            case DAYS -> dateTime.minusDays(amount);
+            case WEEKS -> dateTime.minusWeeks(amount);
+            case MONTHS -> dateTime.minusMonths(amount);
+            case YEARS -> dateTime.minusYears(amount);
+            default -> dateTime.minus(amount, unit);
+        };
+    }
+
     private ChronoUnit toChronoUnit(String intervalType) {
         return switch (intervalType.toLowerCase()) {
-            case "minutes" -> ChronoUnit.MINUTES;
-            case "hours" -> ChronoUnit.HOURS;
-            case "days" -> ChronoUnit.DAYS;
-            case "weeks" -> ChronoUnit.WEEKS;
-            case "months" -> ChronoUnit.MONTHS;
-            case "years" -> ChronoUnit.YEARS;
+            case "minutes", "minute" -> ChronoUnit.MINUTES;
+            case "hours", "hour" -> ChronoUnit.HOURS;
+            case "days", "day" -> ChronoUnit.DAYS;
+            case "weeks", "week" -> ChronoUnit.WEEKS;
+            case "months", "month" -> ChronoUnit.MONTHS;
+            case "years", "year" -> ChronoUnit.YEARS;
             default -> throw new IllegalArgumentException("Unsupported interval type: " + intervalType);
         };
     }

@@ -10,9 +10,9 @@
 		<relativePath /> <!-- lookup parent from repository -->
 	</parent>
 	<groupId>com.newsbucket</groupId>
-	<artifactId>newsbucket-server</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
-	<name>newsbucket-server</name>
+	<artifactId>news-service</artifactId>
+	<version>0.0.1</version>
+	<name>news-service</name>
 	<description>NewsBucket is a smart news search application that fetches and groups news articles by time intervals for any keyword you choose.</description>
 	<url />
 	<licenses>
@@ -101,6 +101,13 @@
 							<artifactId>lombok</artifactId>
 						</exclude>
 					</excludes>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.springframework.boot</groupId>
+				<artifactId>spring-boot-maven-plugin</artifactId>
+				<configuration>
+					<outputDirectory>${basedir}</outputDirectory>
 				</configuration>
 			</plugin>
 		</plugins>
